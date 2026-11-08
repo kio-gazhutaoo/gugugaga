@@ -51,9 +51,9 @@ int main() {
                 }
             }
         }
-
         // 如果找到两个以上灯条，画框
         if (light_bars.size() >= 2) {
+            // 按 X 坐标排序，区分左右灯条
             sort(light_bars.begin(), light_bars.end(), [](RotatedRect a, RotatedRect b) {
                 return a.center.x < b.center.x;
             });
@@ -61,42 +61,51 @@ int main() {
             RotatedRect left_bar = light_bars[0];
             RotatedRect right_bar = light_bars[1];
 
-            Point2f left_pts[4], right_pts[4];
-            left_bar.points(left_pts);
-            right_bar.points(right_pts);
-            // 画黄色小框
-            for (int j = 0; j < 4; j++) {
-                line(frame, left_pts[j], left_pts[(j + 1) % 4], Scalar(0, 255, 255), 2);
-                line(frame, right_pts[j], right_pts[(j + 1) % 4], Scalar(0, 255, 255), 2);
-            }
+            // ====== 核心过滤逻辑：只认长得像装甲板的 ======
+            float dx = right_bar.center.x - left_bar.center.x;
+            float dy = right_bar.center.y - left_bar.center.y;
+            float distance = sqrt(dx * dx + dy * dy);
 
-            // 计算装甲板四个角
-            vector<Point2f> armor_pts(4);
-            armor_pts[0] = Point2f(min(left_pts[0].x, left_pts[1].x), min(left_pts[0].y, left_pts[1].y)); 
-            armor_pts[1] = Point2f(max(right_pts[2].x, right_pts[3].x), min(right_pts[2].y, right_pts[3].y)); 
-            armor_pts[2] = Point2f(max(right_pts[2].x, right_pts[3].x), max(right_pts[2].y, right_pts[3].y)); 
-            armor_pts[3] = Point2f(min(left_pts[0].x, left_pts[1].x), max(left_pts[0].y, left_pts[1].y)); 
+            float h1 = max(left_bar.size.width, left_bar.size.height);
+            float h2 = max(right_bar.size.width, right_bar.size.height);
+            float h_ratio = max(h1, h2) / min(h1, h2); // 两个灯条的长度比例
 
-            // 画绿色角点
-            for (int j = 0; j < 4; j++) {
-                circle(frame, armor_pts[j], 5, Scalar(0, 255, 0), -1);
-            }
+            // 只有满足距离和长宽比条件，才画框
+            if (distance > 40 && distance < 400 && h_ratio < 1.5) {
+                
+                Point2f left_pts[4], right_pts[4];
+                left_bar.points(left_pts);
+                right_bar.points(right_pts);
+                
+                // 1. 画黄框（灯条）
+                for (int j = 0; j < 4; j++) {
+                    line(frame, left_pts[j], left_pts[(j + 1) % 4], Scalar(0, 255, 255), 2);
+                    line(frame, right_pts[j], right_pts[(j + 1) % 4], Scalar(0, 255, 255), 2);
+                }
 
-            // 画蓝色连线大框
-            for (int j = 0; j < 4; j++) {
-                line(frame, armor_pts[j], armor_pts[(j + 1) % 4], Scalar(255, 0, 0), 2);
+                // 2. 计算装甲板四个角点
+                vector<Point2f> armor_pts(4);
+                armor_pts[0] = Point2f(min(left_pts[0].x, left_pts[1].x), min(left_pts[0].y, left_pts[1].y)); 
+                armor_pts[1] = Point2f(max(right_pts[2].x, right_pts[3].x), min(right_pts[2].y, right_pts[3].y)); 
+                armor_pts[2] = Point2f(max(right_pts[2].x, right_pts[3].x), max(right_pts[2].y, right_pts[3].y)); 
+                armor_pts[3] = Point2f(min(left_pts[0].x, left_pts[1].x), max(left_pts[0].y, left_pts[1].y)); 
+
+                // 3. 画绿点和蓝框（装甲板大框）
+                for (int j = 0; j < 4; j++) {
+                    circle(frame, armor_pts[j], 5, Scalar(0, 255, 0), -1);
+                    line(frame, armor_pts[j], armor_pts[(j + 1) % 4], Scalar(255, 0, 0), 2);
+                }
             }
         }
 
-        // 显示画面
+        // 显示画面（删掉了 Mask 窗口）
         imshow("Detection", frame);
-        imshow("Mask", mask);
-
-        // 按 ESC 退出
+        
         if (waitKey(30) == 27) break;
-    }
+    } // 这是 while 循环的结束
 
     cap.release();
     destroyAllWindows();
     return 0;
 }
+
